@@ -1,9 +1,12 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Commands (readCommands) where
 
 import           Control.Monad
 import           Control.Monad.Trans
+import           Data.Attoparsec.ByteString
+import qualified Data.ByteString            as BS
 import           System.IO
-import           Text.Parsec
 
 import           Core
 import           Operations
@@ -12,13 +15,13 @@ readCommands :: XControl ()
 readCommands = do
     h <- liftIO $ openFile "nwm_fifo" ReadMode
     forever $ do
-        l <- liftIO $ hGetLine h
-        either (liftIO . print) id $ runParser command () "command" l
+        l <- liftIO $ BS.hGetLine h
+        whenJust $ maybeResult $ parse command l
 
-command :: Parsec String () (XControl ())
+command :: Parser (XControl ())
 command = pointerCmd
 
-pointerCmd :: Parsec String () (XControl ())
+pointerCmd :: Parser (XControl ())
 pointerCmd = do
-    _ <- string "pointer" >> spaces >> string "focus"
+    _ <- string "pointer focus"
     return (runNWM focusPointer)
