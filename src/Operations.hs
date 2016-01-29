@@ -1,7 +1,7 @@
 module Operations (
     whenJust,
     manage, unmanage, arrange,
-    focus, focusPointer
+    focus, focusPointer, push
 ) where
 
 import           Control.Lens
@@ -31,7 +31,7 @@ focusPointer :: NWM ()
 focusPointer = printErrors $ pointerWindow >>= lift . whenJust . fmap focus
 
 tile :: Window -> NWM ()
-tile win = windowTree %= T.insert (T.Dir T.X T.Neg) 0.5 (T.leaf win)
+tile win = windowTree %= T.insert T.left 0.5 (T.leaf win)
 
 manage :: Window -> NWM ()
 manage win = do
@@ -56,6 +56,15 @@ arrange = do
     rect <- screenRect >>= applyGap
     use windowTree >>= arrangeTree rect
 
+push :: T.Direction -> NWM ()
+push d = use focused >>= whenJust . fmap (pushWin d)
+
+pushWin :: T.Direction -> Window -> NWM ()
+pushWin d win = do
+    t <- use windowTree
+    whenJust $ assign windowTree . T.tree . T.push d <$> T.find win t
+    arrange
+
 shaveRect :: Int -> Rect -> Rect
 shaveRect i (Rect x y w h) = Rect (x+i) (y+i) (w-2*i) (h-2*i)
 
@@ -69,7 +78,7 @@ splitRect T.Y f (Rect x y w h) = (Rect x y w m, Rect x (y+m) w (h-m))
     where m = round (f * (fromIntegral h))
 
 arrangeTree :: Rect -> T.ZipperTree Window -> NWM ()
-arrangeTree rect tree = case T.node tree of
+arrangeTree rect t = case T.cursor t of
     T.Empty        -> return ()
     T.Leaf w       -> applyGap rect >>= moveWindow w
     T.Fork d f l r -> let (lr, rr) = splitRect d f rect in

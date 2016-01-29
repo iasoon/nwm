@@ -10,18 +10,32 @@ import           System.IO
 
 import           Core
 import           Operations
+import qualified ZipperTree                 as T
 
 readCommands :: XControl ()
 readCommands = do
     h <- liftIO $ openFile "nwm_fifo" ReadMode
     forever $ do
         l <- liftIO $ BS.hGetLine h
-        whenJust $ maybeResult $ parse command l
+        runNWM $ whenJust $ maybeResult $ parse command l
 
-command :: Parser (XControl ())
-command = pointerCmd
+command :: Parser (NWM ())
+command =  choice [pointerCmd, windowCmd]
 
-pointerCmd :: Parser (XControl ())
+pointerCmd :: Parser (NWM ())
 pointerCmd = do
     _ <- string "pointer focus"
-    return (runNWM focusPointer)
+    return focusPointer
+
+windowCmd :: Parser (NWM ())
+windowCmd = do
+    _ <- string "push "
+    direction >>= return . push
+
+direction :: Parser T.Direction
+direction = choice
+    [ string "right" >> return T.right
+    , string "left"  >> return T.left
+    , string "up"    >> return T.up
+    , string "down"  >> return T.down
+    ]
