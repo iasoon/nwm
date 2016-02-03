@@ -2,22 +2,40 @@
 
 module Commands (readCommands) where
 
+import           Control.Exception
 import           Control.Monad
 import           Control.Monad.Trans
 import           Data.Attoparsec.ByteString
-import qualified Data.ByteString            as BS
-import           System.IO
+import           Network.Socket             hiding (recv)
+import           Network.Socket.ByteString
+import           System.Directory
+import           System.IO.Error
 
 import           Core
 import           Operations
 import qualified ZipperTree                 as T
 
+address :: String
+address = "/tmp/nwm_socket"
+
+openSocket :: IO Socket
+openSocket = do
+    sock <- socket AF_UNIX Stream defaultProtocol
+    removeFile address `catch` \e -> unless (isDoesNotExistError e) (throwIO e)
+    bind sock $ SockAddrUnix address
+    listen sock sOMAXCONN
+    return sock
+
 readCommands :: XControl ()
 readCommands = do
-    h <- liftIO $ openFile "nwm_fifo" ReadMode
-    forever $ do
-        l <- liftIO $ BS.hGetLine h
-        runNWM $ whenJust $ maybeResult $ parse command l
+    sock <- liftIO openSocket
+    forever (liftIO (accept sock) >>= serveClient)
+
+serveClient :: (Socket, SockAddr) -> XControl ()
+serveClient (sock, _) = do
+    str <- liftIO $ recv sock 4096
+    runNWM $ whenJust $ maybeResult $ parse command str
+    liftIO $ close sock
 
 command :: Parser (NWM ())
 command =  choice [windowCmd, focusCmd]
