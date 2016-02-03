@@ -20,17 +20,19 @@ readCommands = do
         runNWM $ whenJust $ maybeResult $ parse command l
 
 command :: Parser (NWM ())
-command =  choice [pointerCmd, windowCmd]
-
-pointerCmd :: Parser (NWM ())
-pointerCmd = do
-    _ <- string "pointer focus"
-    return focusPointer
+command =  choice [windowCmd, focusCmd]
 
 windowCmd :: Parser (NWM ())
 windowCmd = do
     _ <- string "push "
     direction >>= return . push
+
+focusCmd :: Parser (NWM ())
+focusCmd = string "focus " >> choice
+    [ string "pointer" >> return focusPointer
+    , moveFocus <$> direction
+    ]
+
 
 direction :: Parser T.Direction
 direction = choice

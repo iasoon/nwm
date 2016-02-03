@@ -1,11 +1,14 @@
 module Operations (
     whenJust,
     manage, unmanage, arrange,
-    focus, focusPointer, push
+    focus, focusPointer, moveFocus, push
 ) where
 
 import           Control.Lens
 import           Control.Monad.Trans
+import           Data.Function       (on)
+import           Data.List
+import qualified Data.Map            as M
 
 import           Core
 import           XControl
@@ -83,3 +86,34 @@ arrangeTree rect t = case T.cursor t of
     T.Leaf w       -> applyGap rect >>= moveWindow w
     T.Fork d f l r -> let (lr, rr) = splitRect d f rect in
                          arrangeTree lr l >> arrangeTree rr r
+
+--------------------------------------------------------------------------------
+
+moveFocus :: T.Direction -> NWM ()
+moveFocus d = use focused >>= whenJust . fmap (focusClosest d)
+
+focusClosest :: T.Direction -> Window -> NWM ()
+focusClosest d win = do
+    pt <- fmap center <$> use (windowRect win)
+    candidates <- M.assocs . M.delete win <$> use windowRects
+    whenJust . fmap focus $ pt >>= closest d candidates
+
+
+closest :: T.Direction -> [(Window, Rect)] -> (Int, Int) -> Maybe Window
+closest d ws pt
+    | null candidates = Nothing
+    | otherwise       = Just $ fst $ minimumBy (compare `on` snd) candidates
+    where candidates = map (over _2 (\(x,y) -> div (x + y) 2)) cone
+          cone = filter ((\(x,y) -> y <= x) . snd) wpos
+          wpos = map (over _2 (over _2 abs . relativeTo d pt . center)) ws
+
+center :: Rect -> (Int, Int)
+center (Rect x y w h) = (x + (w `div` 2), y + (h `div` 2))
+
+relativeTo :: T.Direction -> (Int, Int) -> (Int, Int) -> (Int, Int)
+relativeTo d (xRef, yRef) (x,y)
+    | d == T.right = ( dx, dy)
+    | d == T.left  = (-dx, dy)
+    | d == T.up    = (-dy,-dx)
+    | otherwise    = ( dy, dx)
+    where (dx, dy) = (x - xRef, y - yRef)

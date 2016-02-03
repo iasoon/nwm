@@ -4,7 +4,8 @@
 
 module Core (
     XControl, runXControl, forkControl,
-    windowTree, focused, windowGap, windowRect,
+    windowTree, focused, windowGap, 
+    windowRects, windowRect,
     NWM, runNWM, NWMState, initialState,
     HasControl (..),
     Rect (..), Window, Tag
