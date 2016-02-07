@@ -44,27 +44,27 @@ command =  choice [windowCmd, focusCmd]
 
 windowCmd :: Parser (NWM ())
 windowCmd = choice
-    [ string "push " >> direction >>= return . push
-    , string "show " >> showWindow <$> window
-    , string "hide " >> hideWindow <$> window
+    [ "push " *> direction >>= return . push
+    , "show " *> (showWindow <$> window)
+    , "hide " *> (hideWindow <$> window)
     ]
 
 focusCmd :: Parser (NWM ())
-focusCmd = string "focus " >> choice
-    [ string "pointer" >> return focusPointer
+focusCmd = "focus " *> choice
+    [ "pointer" *> return focusPointer
     , moveFocus <$> direction
     ]
 
 direction :: Parser T.Direction
 direction = choice
-    [ string "right" >> return T.right
-    , string "left"  >> return T.left
-    , string "up"    >> return T.up
-    , string "down"  >> return T.down
+    [ "right" *> return T.right
+    , "left"  *> return T.left
+    , "up"    *> return T.up
+    , "down"  *> return T.down
     ]
 
 window :: Parser Window
 window = convertXid <$> hexword
 
 hexword :: Parser Word32
-hexword = option "" (string "0x") >> hexadecimal
+hexword = option "" "0x" >> hexadecimal
