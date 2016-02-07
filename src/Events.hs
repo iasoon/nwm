@@ -27,4 +27,4 @@ handleMapRequest :: X.MapRequestEvent -> XControl ()
 handleMapRequest e = runNWM . manage $ X.window_MapRequestEvent e
 
 handleUnmapNotify :: X.UnmapNotifyEvent -> XControl ()
-handleUnmapNotify e = runNWM . unmanage $ X.window_UnmapNotifyEvent e
+handleUnmapNotify e = return () --runNWM . unmanage $ X.window_UnmapNotifyEvent e

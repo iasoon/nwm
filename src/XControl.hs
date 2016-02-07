@@ -9,7 +9,8 @@ module XControl (
     pointerPosition, pointerWindow,
     getWindowGeometry, setWindowGeometry,
     subscribeEvents, waitForEvent,
-    screenRect
+    screenRect,
+    convertXid
 ) where
 
 import Control.Monad.Reader

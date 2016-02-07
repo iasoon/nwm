@@ -4,7 +4,7 @@
 
 module Core (
     XControl, runXControl, forkControl,
-    windowTree, focused, windowGap,
+    windowTree, focused, windowGap, visibleWindows,
     windowRects, windowRect,
     NWM, runNWM, NWMState, initialState,
     HasControl (..),
@@ -16,6 +16,7 @@ import           Control.Lens
 import           Control.Monad.Reader
 import           Control.Monad.State
 import qualified Data.Map             as M
+import qualified Data.Set             as S
 import           Graphics.XHB         (Connection, WINDOW)
 
 import qualified ZipperTree           as T
@@ -26,10 +27,11 @@ type Tag = String
 data Rect = Rect Int Int Int Int
 
 data NWMState = NWMState
-    { _windowRects :: M.Map Window Rect
-    , _windowTree  :: T.ZipperTree Window
-    , _focused     :: Maybe Window
-    , _windowGap   :: Int
+    { _windowRects    :: M.Map Window Rect
+    , _visibleWindows :: S.Set Window
+    , _windowTree     :: T.ZipperTree Window
+    , _focused        :: Maybe Window
+    , _windowGap      :: Int
     }
 
 makeLenses ''NWMState
@@ -39,10 +41,11 @@ windowRect win = windowRects . at win
 
 initialState :: NWMState
 initialState = NWMState
-    { _windowRects   = M.empty
-    , _windowTree    = T.empty
-    , _focused       = Nothing
-    , _windowGap     = 0
+    { _windowRects    = M.empty
+    , _visibleWindows = S.empty
+    , _windowTree     = T.empty
+    , _focused        = Nothing
+    , _windowGap      = 0
     }
 
 data XConf = XConf

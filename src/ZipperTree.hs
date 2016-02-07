@@ -4,12 +4,13 @@ module ZipperTree (
     empty, cursor, leaf,
     insert, delete,
     prune, push, tree, find,
+    zip, unzip,
     left, right, up, down
 ) where
 
 import           Data.Foldable (foldl')
 import           Data.Maybe
-import           Prelude       hiding (negate)
+import           Prelude       hiding (negate, unzip, zip)
 
 data Axis = X | Y deriving (Show, Eq)
 
@@ -155,3 +156,20 @@ insertDeep d t loc = case descend (negate s) loc of
     Just loc' -> insert (opposite d) 0.5 t <$> loc'
     Nothing   -> insert d 0.5 t <$> loc
     where (Dir _ s) = d
+
+zip :: (a -> Bool) -> ZipperTree a -> ZipperTree a
+zip cond t = t >>= zipNode cond
+
+zipNode :: (a -> Bool) -> Node a -> ZipperTree a
+zipNode _    Empty          = pure Empty
+zipNode cond (Fork a p l r) = fork a p (zip cond l) (zip cond r)
+zipNode cond (Leaf a)
+    | cond a    = pure (Leaf a)
+    | otherwise = Zipper [pure (Ctx left 1.0 (pure (Leaf a)))] Empty
+
+unzip :: ZipperTree a -> ZipperTree a
+unzip (Zipper cs n) = foldl' applyContext (pure $ unzipNode n) cs
+
+unzipNode :: Node a -> Node a
+unzipNode (Fork a p l r) = Fork a p (unzip l) (unzip r)
+unzipNode n              = n

@@ -1,7 +1,8 @@
 module Operations (
     whenJust,
     manage, unmanage, arrange,
-    focus, focusPointer, moveFocus, push
+    focus, focusPointer, moveFocus, push,
+    showWindow, hideWindow
 ) where
 
 import           Control.Lens
@@ -9,6 +10,7 @@ import           Control.Monad.Trans
 import           Data.Function       (on)
 import           Data.List
 import qualified Data.Map            as M
+import qualified Data.Set            as S
 
 import           Core
 import           XControl
@@ -39,15 +41,26 @@ tile win = windowTree %= T.insert T.left 0.5 (T.leaf win)
 manage :: Window -> NWM ()
 manage win = do
     registerWindow win
-    mapWindow win
     tile win
+    showWindow win
+
+showWindow :: Window -> NWM ()
+showWindow win = do
+    visibleWindows %= S.insert win
+    mapWindow win
+    arrange
+
+hideWindow :: Window -> NWM ()
+hideWindow win = do
+    visibleWindows %= S.delete win
+    unmapWindow win
     arrange
 
 unmanage :: Window -> NWM ()
 unmanage win = do
     windowRect win .= Nothing
-    windowTree %= T.delete win
-    arrange
+    windowTree %= T.delete win . T.unzip
+    hideWindow win
 
 registerWindow :: Window -> NWM ()
 registerWindow win = printErrors $ do
@@ -56,8 +69,14 @@ registerWindow win = printErrors $ do
 
 arrange :: NWM ()
 arrange = do
+    rezip
     rect <- screenRect >>= applyGap
     use windowTree >>= arrangeTree rect
+
+rezip :: NWM ()
+rezip = do
+    isVisible <- flip S.member <$> use visibleWindows
+    windowTree %= T.zip isVisible . T.unzip
 
 push :: T.Direction -> NWM ()
 push d = use focused >>= whenJust . fmap (pushWin d)
@@ -86,8 +105,6 @@ arrangeTree rect t = case T.cursor t of
     T.Leaf w       -> applyGap rect >>= moveWindow w
     T.Fork d f l r -> let (lr, rr) = splitRect d f rect in
                          arrangeTree lr l >> arrangeTree rr r
-
---------------------------------------------------------------------------------
 
 moveFocus :: T.Direction -> NWM ()
 moveFocus d = use focused >>= whenJust . fmap (focusClosest d)
