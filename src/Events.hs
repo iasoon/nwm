@@ -18,13 +18,17 @@ handleSomeEvent :: X.SomeEvent -> XControl ()
 handleSomeEvent e = mapM_ (handleEvent e)
     [ EventHandler handleMapRequest
     , EventHandler handleUnmapNotify
+    , EventHandler handleDestroyNotify
     ]
 
 handleEvents :: XControl ()
 handleEvents = forever $ waitForEvent >>= handleSomeEvent
 
 handleMapRequest :: X.MapRequestEvent -> XControl ()
-handleMapRequest e = runNWM . manage $ X.window_MapRequestEvent e
+handleMapRequest = runNWM . manage . X.window_MapRequestEvent
 
 handleUnmapNotify :: X.UnmapNotifyEvent -> XControl ()
-handleUnmapNotify e = return () --runNWM . unmanage $ X.window_UnmapNotifyEvent e
+handleUnmapNotify = runNWM . hideWindow . X.window_UnmapNotifyEvent
+
+handleDestroyNotify :: X.DestroyNotifyEvent -> XControl ()
+handleDestroyNotify = runNWM . unmanage . X.window_DestroyNotifyEvent
