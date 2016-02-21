@@ -49,18 +49,28 @@ showWindow win = do
     visibleWindows %= S.insert win
     mapWindow win
     arrange
+    use focused >>= \foc -> case foc of
+        Nothing -> focus win
+        _       -> return ()
+
+checkFocus :: Window -> NWM ()
+checkFocus unmapped = use focused >>= \foc -> case foc of
+    Just w | w == unmapped -> focusClosest unmapped
+    _                      -> return ()
+
 
 hideWindow :: Window -> NWM ()
 hideWindow win = do
     visibleWindows %= S.delete win
     unmapWindow win
     arrange
+    checkFocus win
 
 unmanage :: Window -> NWM ()
 unmanage win = do
-    windowRect win .= Nothing
     windowTree %= T.delete win . T.unzip
-    hideWindow win
+    rezip
+    windowRect win .= Nothing
 
 registerWindow :: Window -> NWM ()
 registerWindow win = printErrors $ do
@@ -106,23 +116,41 @@ arrangeTree rect t = case T.cursor t of
     T.Fork d f l r -> let (lr, rr) = splitRect d f rect in
                          arrangeTree lr l >> arrangeTree rr r
 
+visibleWindowRects :: NWM [(Window, Rect)]
+visibleWindowRects = do
+    isVisible <- flip S.member <$> use visibleWindows
+    filter (isVisible . fst) . M.assocs <$> use windowRects
+
+focusClosest :: Window -> NWM ()
+focusClosest win = do
+    Just rect <- use (windowRect win)
+    candidates <- filter ((/=win) . fst) <$> visibleWindowRects
+    whenJust . fmap focus $ closestWin candidates (center rect)
+
+
 moveFocus :: T.Direction -> NWM ()
-moveFocus d = use focused >>= whenJust . fmap (focusClosest d)
+moveFocus d = do
+    win' <- use focused
+    case win' of
+      Nothing -> return ()
+      Just win -> do
+        pt <- fmap center <$> use (windowRect win)
+        candidates <- filter ((/=win) . fst) <$> visibleWindowRects
+        whenJust . fmap focus $ pt >>= closestWin' d candidates
 
-focusClosest :: T.Direction -> Window -> NWM ()
-focusClosest d win = do
-    pt <- fmap center <$> use (windowRect win)
-    candidates <- M.assocs . M.delete win <$> use windowRects
-    whenJust . fmap focus $ pt >>= closest d candidates
 
+closest :: [(a, (Int, Int))] -> Maybe a
+closest [] = Nothing
+closest cs = Just $ fst $ lowest $ map (over _2 centerDist) cs
+    where lowest = minimumBy (compare `on` snd)
+          centerDist (x,y) = div (abs x + abs y) 2
 
-closest :: T.Direction -> [(Window, Rect)] -> (Int, Int) -> Maybe Window
-closest d ws pt
-    | null candidates = Nothing
-    | otherwise       = Just $ fst $ minimumBy (compare `on` snd) candidates
-    where candidates = map (over _2 (\(x,y) -> div (x + y) 2)) cone
-          cone = filter ((\(x,y) -> y <= x) . snd) wpos
-          wpos = map (over _2 (over _2 abs . relativeTo d pt . center)) ws
+closestWin :: [(Window, Rect)] -> (Int, Int) -> Maybe Window
+closestWin rects pt = closest . relativeCenters T.right pt $ rects
+
+closestWin' :: T.Direction -> [(Window, Rect)] -> (Int, Int) -> Maybe Window
+closestWin' d rects pt =  closest . inCone . relativeCenters d pt $ rects
+    where inCone = filter ((\(x,y) -> x >= abs y) . snd)
 
 center :: Rect -> (Int, Int)
 center (Rect x y w h) = (x + (w `div` 2), y + (h `div` 2))
@@ -134,3 +162,6 @@ relativeTo d (xRef, yRef) (x,y)
     | d == T.up    = (-dy,-dx)
     | otherwise    = ( dy, dx)
     where (dx, dy) = (x - xRef, y - yRef)
+
+relativeCenters :: T.Direction -> (Int, Int) -> [(a, Rect)] -> [(a, (Int, Int))]
+relativeCenters d pt = map (over _2 (relativeTo d pt . center))
