@@ -1,11 +1,12 @@
 module Operations (
     whenJust,
-    manage, unmanage, arrange,
+    unmanage, arrange,
     focus, focusPointer, moveFocus, push,
     showWindow, hideWindow
 ) where
 
 import           Control.Lens
+import  Control.Monad
 import           Control.Monad.Trans
 import           Data.Function       (on)
 import           Data.List
@@ -38,33 +39,27 @@ focusPointer = printErrors $ pointerWindow >>= lift . whenJust . fmap focus
 tile :: Window -> NWM ()
 tile win = windowTree %= T.insert T.left 0.5 (T.leaf win)
 
-manage :: Window -> NWM ()
-manage win = do
-    registerWindow win
-    tile win
-    showWindow win
+isClient :: Window -> NWM Bool
+isClient win = M.member win <$> use windowRects
 
 showWindow :: Window -> NWM ()
 showWindow win = do
-    visibleWindows %= S.insert win
     mapWindow win
+    client <- isClient win
+    when (not client) (registerWindow win >> tile win)
+    visibleWindows %= S.insert win
     arrange
     use focused >>= \foc -> case foc of
         Nothing -> focus win
         _       -> return ()
 
-checkFocus :: Window -> NWM ()
-checkFocus unmapped = use focused >>= \foc -> case foc of
-    Just w | w == unmapped -> focusClosest unmapped
-    _                      -> return ()
-
-
 hideWindow :: Window -> NWM ()
 hideWindow win = do
     visibleWindows %= S.delete win
-    unmapWindow win
     arrange
-    checkFocus win
+    use focused >>= \foc -> case foc of
+        Just w | w == win -> focusClosest win
+        _                 -> return ()
 
 unmanage :: Window -> NWM ()
 unmanage win = do

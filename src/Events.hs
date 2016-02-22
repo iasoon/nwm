@@ -25,7 +25,7 @@ handleEvents :: XControl ()
 handleEvents = forever $ waitForEvent >>= handleSomeEvent
 
 handleMapRequest :: X.MapRequestEvent -> XControl ()
-handleMapRequest = runNWM . manage . X.window_MapRequestEvent
+handleMapRequest = runNWM . showWindow . X.window_MapRequestEvent
 
 handleUnmapNotify :: X.UnmapNotifyEvent -> XControl ()
 handleUnmapNotify = runNWM . hideWindow . X.window_UnmapNotifyEvent

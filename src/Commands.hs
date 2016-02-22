@@ -43,11 +43,7 @@ command :: Parser (NWM ())
 command =  choice [windowCmd, focusCmd]
 
 windowCmd :: Parser (NWM ())
-windowCmd = choice
-    [ "push " *> direction >>= return . push
-    , "show " *> (showWindow <$> window)
-    , "hide " *> (hideWindow <$> window)
-    ]
+windowCmd = "push " *> direction >>= return . push
 
 focusCmd :: Parser (NWM ())
 focusCmd = "focus " *> choice
