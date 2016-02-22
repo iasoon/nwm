@@ -45,7 +45,7 @@ initialState = NWMState
     , _visibleWindows = S.empty
     , _windowTree     = T.empty
     , _focused        = Nothing
-    , _windowGap      = 0
+    , _windowGap      = 5
     }
 
 data XConf = XConf

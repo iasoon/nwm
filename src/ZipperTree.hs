@@ -3,9 +3,9 @@ module ZipperTree (
     Node (..), ZipperTree,
     empty, cursor, leaf,
     insert, delete,
-    prune, push, tree, find,
+    prune, push, tree, find, lastDir,
     zip, unzip,
-    left, right, up, down
+    left, right, up, down, rotRight
 ) where
 
 import           Data.Foldable (foldl')
@@ -24,6 +24,10 @@ data Direction = Dir Axis Sign deriving (Show, Eq)
 
 opposite :: Direction -> Direction
 opposite (Dir a s) = Dir a (negate s)
+
+rotRight :: Direction -> Direction
+rotRight (Dir X s) = Dir Y s
+rotRight (Dir Y s) = Dir X (negate s)
 
 left :: Direction
 left = Dir X Neg

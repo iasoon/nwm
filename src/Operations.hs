@@ -11,6 +11,7 @@ import           Control.Monad.Trans
 import           Data.Function       (on)
 import           Data.List
 import qualified Data.Map            as M
+import           Data.Maybe
 import qualified Data.Set            as S
 
 import           Core
@@ -37,7 +38,12 @@ focusPointer :: NWM ()
 focusPointer = printErrors $ pointerWindow >>= lift . whenJust . fmap focus
 
 tile :: Window -> NWM ()
-tile win = windowTree %= T.insert T.left 0.5 (T.leaf win)
+tile win = do
+    foc <- use focused
+    tree <- use windowTree
+    let loc = fromMaybe (pure tree) (foc >>= flip T.find tree)
+    let dir = maybe (T.right) T.rotRight (T.lastDir loc)
+    windowTree .= (T.tree . fmap (T.insert dir 0.5 (T.leaf win)) $ loc)
 
 isClient :: Window -> NWM Bool
 isClient win = M.member win <$> use windowRects
@@ -49,9 +55,7 @@ showWindow win = do
     when (not client) (registerWindow win >> tile win)
     visibleWindows %= S.insert win
     arrange
-    use focused >>= \foc -> case foc of
-        Nothing -> focus win
-        _       -> return ()
+    focus win
 
 hideWindow :: Window -> NWM ()
 hideWindow win = do
@@ -82,8 +86,6 @@ rezip :: NWM ()
 rezip = do
     isVisible <- flip S.member <$> use visibleWindows
     windowTree %= T.zip isVisible . T.unzip
-    liftIO $ print ""
-    use windowTree >>= liftIO . print
 
 push :: T.Direction -> NWM ()
 push d = use focused >>= whenJust . fmap (pushWin d)
