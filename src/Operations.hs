@@ -6,7 +6,7 @@ module Operations (
 ) where
 
 import           Control.Lens
-import  Control.Monad
+import           Control.Monad
 import           Control.Monad.Trans
 import           Data.Function       (on)
 import           Data.List
@@ -82,6 +82,8 @@ rezip :: NWM ()
 rezip = do
     isVisible <- flip S.member <$> use visibleWindows
     windowTree %= T.zip isVisible . T.unzip
+    liftIO $ print ""
+    use windowTree >>= liftIO . print
 
 push :: T.Direction -> NWM ()
 push d = use focused >>= whenJust . fmap (pushWin d)

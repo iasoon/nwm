@@ -148,8 +148,8 @@ push' d loc = lastDir loc >>= \d' -> case () of
 
 insertUp :: Direction -> ZipperTree a -> Location a -> Maybe (Location a)
 insertUp d t loc = lastDir loc >>= \d' -> case () of
-    _ | d == d'   -> fmap (insert d 0.5 t) <$> ascend loc
-      | otherwise -> fmap (insert (opposite d) 0.5 t) <$> sibling loc
+    _ | opposite d == d' -> fmap (insert (opposite d) 0.5 t) <$> sibling loc
+      | otherwise        -> fmap (insert d 0.5 t) <$> ascend loc
 
 insertDeep :: Direction -> ZipperTree a -> Location a -> Location a
 insertDeep d t loc = case descend (negate s) loc of
