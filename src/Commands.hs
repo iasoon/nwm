@@ -10,6 +10,7 @@ import           Data.Word                        (Word32)
 import           Network.Socket                   hiding (recv)
 import           Network.Socket.ByteString
 import           System.Directory
+import           System.Exit                      (exitSuccess)
 import           System.IO.Error
 
 import           Core
@@ -42,7 +43,7 @@ serveClient (sock, _) = do
     liftIO $ close sock
 
 command :: Parser (NWM ())
-command =  choice [contextCmd, windowCmd, focusCmd]
+command =  choice [windowCmd, focusCmd, contextCmd, exitCmd]
 
 windowCmd :: Parser (NWM ())
 windowCmd = "push " *> (push <$> direction)
@@ -66,6 +67,9 @@ contextCmd = choice
     [ "show " *> (showContext <$> context)
     , "hide " *> (hideContext <$> context)
     ]
+
+exitCmd :: Parser (NWM ())
+exitCmd = "exit" *> return (liftIO exitSuccess)
 
 window :: Parser Window
 window = convertXid <$> hexword
