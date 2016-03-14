@@ -14,7 +14,7 @@ module Core (
 ) where
 
 import           Control.Concurrent
-import           Control.Lens hiding (Context)
+import           Control.Lens         hiding (Context)
 import           Control.Monad.Reader
 import           Control.Monad.State
 import qualified Data.Map             as M

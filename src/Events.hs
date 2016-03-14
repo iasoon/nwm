@@ -17,7 +17,7 @@ handleEvent e (EventHandler h) = whenJust (X.fromEvent e >>= return . h)
 handleSomeEvent :: X.SomeEvent -> XControl ()
 handleSomeEvent e = mapM_ (handleEvent e)
     [ EventHandler handleMapRequest
-    , EventHandler handleUnmapNotify
+    {-, EventHandler handleUnmapNotify-}
     , EventHandler handleDestroyNotify
     ]
 
@@ -25,7 +25,7 @@ handleEvents :: XControl ()
 handleEvents = forever $ waitForEvent >>= handleSomeEvent
 
 handleMapRequest :: X.MapRequestEvent -> XControl ()
-handleMapRequest = runNWM . showWindow . X.window_MapRequestEvent
+handleMapRequest = runNWM . manage . X.window_MapRequestEvent
 
 handleUnmapNotify :: X.UnmapNotifyEvent -> XControl ()
 handleUnmapNotify = runNWM . hideWindow . X.window_UnmapNotifyEvent

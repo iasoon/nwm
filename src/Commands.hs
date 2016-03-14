@@ -35,15 +35,17 @@ readCommands = do
 
 serveClient :: (Socket, SockAddr) -> XControl ()
 serveClient (sock, _) = do
-    str <- liftIO $ recv sock 4096
-    runNWM $ whenJust $ maybeResult $ parse command str
+    res <- liftIO $ parseOnly command <$> recv sock 4096
+    case res of
+      Right cmd -> runNWM cmd
+      Left  err -> liftIO $ putStrLn err
     liftIO $ close sock
 
 command :: Parser (NWM ())
-command =  choice [windowCmd, focusCmd]
+command =  choice [contextCmd, windowCmd, focusCmd]
 
 windowCmd :: Parser (NWM ())
-windowCmd = "push " *> direction >>= return . push
+windowCmd = "push " *> (push <$> direction)
 
 focusCmd :: Parser (NWM ())
 focusCmd = "focus " *> choice
@@ -59,8 +61,17 @@ direction = choice
     , "down"  *> return T.down
     ]
 
+contextCmd :: Parser (NWM ())
+contextCmd = choice
+    [ "show " *> (showContext <$> context)
+    , "hide " *> (hideContext <$> context)
+    ]
+
 window :: Parser Window
 window = convertXid <$> hexword
+
+context :: Parser Context
+context = Named <$> many1 (notChar '\n')
 
 hexword :: Parser Word32
 hexword = option "" "0x" >> hexadecimal

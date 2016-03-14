@@ -1,8 +1,9 @@
 module Operations (
     whenJust,
-    unmanage, arrange,
+    manage, unmanage, arrange,
+    hideWindow,
     focus, focusPointer, moveFocus, push,
-    showWindow, hideWindow
+    showContext, hideContext
 ) where
 
 import           Control.Lens        hiding (Context)
@@ -37,6 +38,7 @@ focus :: Window -> NWM ()
 focus win = do
     Just ctx <- use $ windowContexts . at win
     contextData ctx . focusedWindow .= Just win
+    activeContexts %= (ctx:) . (delete ctx)
     giveFocus win
 
 
@@ -47,7 +49,7 @@ focusPointer = printErrors $ pointerWindow >>= lift . whenJust . fmap focus
 activeContextData :: NWM [ContextData]
 activeContextData = do
     ctxDataMap <- use contextDataMap
-    catMaybes . map (flip M.lookup ctxDataMap) <$> use activeContexts
+    mapMaybe (flip M.lookup ctxDataMap) <$> use activeContexts
 
 
 visibleWs :: NWM (S.Set Window)
@@ -55,8 +57,10 @@ visibleWs = S.unions . map (view visibleWindows) <$> activeContextData
 
 
 focusedWin :: NWM (Maybe Window)
-focusedWin = first . map (view focusedWindow) <$> activeContextData
-    where first = listToMaybe . catMaybes
+focusedWin = listToMaybe . mapMaybe (view focusedWindow) <$> activeContextData
+
+fixFocus :: NWM ()
+fixFocus = focusedWin >>= whenJust . fmap giveFocus
 
 selectedContext :: NWM Context
 selectedContext = fromMaybe Root . listToMaybe <$> use activeContexts
@@ -78,8 +82,6 @@ isClient win = M.member win <$> use windowRects
 showWindow :: Window -> NWM ()
 showWindow win = do
     mapWindow win
-    client <- isClient win
-    when (not client) (registerWindow win >> tile win)
     Just ctx <- use $ windowContexts . at win
     contextData ctx . visibleWindows %= S.insert win
     arrange
@@ -95,18 +97,34 @@ hideWindow win = do
         Just w | w == win -> focusClosest win
         _                 -> return ()
 
+showContext :: Context -> NWM ()
+showContext ctx = do
+    activeContexts %= (ctx:) . (delete ctx)
+    use (contextData ctx . visibleWindows) >>= mapM_ mapWindow
+    fixFocus >> arrange
+
+
+hideContext :: Context -> NWM ()
+hideContext ctx = do
+    activeContexts %= delete ctx
+    use (contextData ctx . visibleWindows) >>= mapM_ unmapWindow
+    fixFocus >> arrange
+
+
+manage :: Window -> NWM ()
+manage win = do
+    printErrors $ getWindowGeometry win >>= assign (windowRect win) . Just
+    selectedContext >>= assign (windowContexts . at win) . Just
+    tile win
+    showWindow win
+
+
 
 unmanage :: Window -> NWM ()
 unmanage win = do
     windowTree %= T.delete win . T.unzip
-    rezip
+    hideWindow win
     windowRect win .= Nothing
-
-
-registerWindow :: Window -> NWM ()
-registerWindow win = printErrors $ do
-    getWindowGeometry win >>= assign (windowRect win) . Just
-    lift selectedContext >>= assign (windowContexts . at win) . Just
 
 
 arrange :: NWM ()
