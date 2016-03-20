@@ -13,8 +13,10 @@ import           System.Directory
 import           System.Exit                      (exitSuccess)
 import           System.IO.Error
 
+import           Contexts
 import           Core
-import           Operations
+import           Focus
+import           Windows
 import           XControl                         (convertXid)
 import qualified ZipperTree                       as T
 
@@ -46,13 +48,10 @@ command :: Parser (NWM ())
 command =  choice [windowCmd, focusCmd, contextCmd, exitCmd]
 
 windowCmd :: Parser (NWM ())
-windowCmd = "push " *> (push <$> direction)
+windowCmd = "push " *> ((>> arrange) <$>  (push <$> direction))
 
 focusCmd :: Parser (NWM ())
-focusCmd = "focus " *> choice
-    [ "pointer" *> return focusPointer
-    , moveFocus <$> direction
-    ]
+focusCmd = "focus " *> (moveFocus <$> direction)
 
 direction :: Parser T.Direction
 direction = choice
@@ -63,7 +62,7 @@ direction = choice
     ]
 
 contextCmd :: Parser (NWM ())
-contextCmd = choice
+contextCmd = (>> arrange) <$> choice
     [ "show " *> (showContext <$> context)
     , "hide " *> (hideContext <$> context)
     ]

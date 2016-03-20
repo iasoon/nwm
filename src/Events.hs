@@ -6,7 +6,7 @@ import           Control.Monad
 import qualified Graphics.XHB  as X
 
 import           Core
-import           Operations
+import           Windows
 import           XControl
 
 data EventHandler = forall e . X.Event e => EventHandler (e -> XControl ())
@@ -27,8 +27,8 @@ handleEvents = forever $ waitForEvent >>= handleSomeEvent
 handleMapRequest :: X.MapRequestEvent -> XControl ()
 handleMapRequest = runNWM . manage . X.window_MapRequestEvent
 
-handleUnmapNotify :: X.UnmapNotifyEvent -> XControl ()
-handleUnmapNotify = runNWM . hideWindow . X.window_UnmapNotifyEvent
+{-handleUnmapNotify :: X.UnmapNotifyEvent -> XControl ()-}
+{-handleUnmapNotify = runNWM . hideWindow . X.window_UnmapNotifyEvent-}
 
 handleDestroyNotify :: X.DestroyNotifyEvent -> XControl ()
 handleDestroyNotify = runNWM . unmanage . X.window_DestroyNotifyEvent

@@ -8,6 +8,7 @@ module Core (
     windowContexts,
     contextDataMap, contextData,
     focusedWindow, visibleWindows,
+    whenJust,
     NWM, runNWM, NWMState, initialState,
     HasControl (..),
     Rect (..), Window, Context (..), ContextData (..)
@@ -124,3 +125,7 @@ instance HasControl XControl where
 
 instance HasControl NWM where
     askConnection = NWM $ lift askConnection
+
+
+whenJust :: Monad m => Maybe (m ()) -> m ()
+whenJust = maybe (return ()) id

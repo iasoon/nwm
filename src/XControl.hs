@@ -4,9 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module XControl (
-    XRequest, runXRequest,
     mapWindow, unmapWindow, giveFocus,
-    pointerPosition, pointerWindow,
     getWindowGeometry, setWindowGeometry,
     subscribeEvents, waitForEvent,
     screenRect,
@@ -14,20 +12,10 @@ module XControl (
 ) where
 
 import Control.Monad.Reader
-import Control.Monad.State
 import Control.Monad.Except
 import qualified Graphics.XHB as X
 
 import Core
-
-newtype XRequest m a = XRequest (ExceptT X.SomeError m a)
-    deriving (Functor, Applicative, Monad, MonadIO, MonadTrans, MonadState s)
-
-instance HasControl m => HasControl (XRequest m) where
-    askConnection = XRequest $ lift $ askConnection
-
-runXRequest :: (Monad m) => (X.SomeError -> m a) -> XRequest m a -> m a
-runXRequest handler (XRequest req) = runExceptT req >>= either handler return
 
 noWindow :: Window
 noWindow = X.fromXid X.xidNone
@@ -38,27 +26,11 @@ withConn f arg = askConnection >>= liftIO . flip f arg
 withConn2 :: HasControl m => (X.Connection -> a -> b -> IO c) -> a -> b -> m c
 withConn2 = curry . withConn . (uncurry .)
 
-requestWithConn :: HasControl m => (X.Connection ->  a -> IO (X.Receipt b))
-                                   -> a -> XRequest m b
-requestWithConn f arg = withConn f arg >>= getReply
-    where getReply = XRequest . ExceptT . liftIO . X.getReply
-
 getRoot :: HasControl m => m Window
 getRoot = X.getRoot <$> askConnection
 
 getWindow :: Window -> Maybe Window
 getWindow w = guard (w /= noWindow) >> return w
-
-queryPointer :: HasControl m => XRequest m X.QueryPointerReply
-queryPointer = getRoot >>= requestWithConn X.queryPointer
-
-pointerWindow :: HasControl m => XRequest m (Maybe Window)
-pointerWindow = getWindow . X.child_QueryPointerReply <$> queryPointer
-
-pointerPosition :: HasControl m => XRequest m (Int, Int)
-pointerPosition = getPos <$> queryPointer
-    where getPos reply = (fromIntegral $ X.root_x_QueryPointerReply reply
-                         ,fromIntegral $ X.root_y_QueryPointerReply reply)
 
 convertXid :: (X.XidLike a, X.XidLike b) => a -> b
 convertXid = X.fromXid . X.toXid
@@ -78,8 +50,12 @@ setWindowGeometry window (Rect x y w h) =
         , (X.ConfigWindowHeight, fromIntegral h)
         ]
 
-getWindowGeometry :: HasControl m => Window -> XRequest m Rect
-getWindowGeometry = fmap getRect . requestWithConn X.getGeometry . convertXid
+getWindowGeometry :: HasControl m => Window -> m Rect
+getWindowGeometry win = do
+    resp <- withConn X.getGeometry (convertXid win) >>= liftIO . X.getReply
+    case resp of
+      Right reply -> return $ getRect reply
+      Left  err   -> error (show err) -- TODO: do not crash
     where getRect reply = Rect
             (fromIntegral $ X.x_GetGeometryReply reply)
             (fromIntegral $ X.y_GetGeometryReply reply)
