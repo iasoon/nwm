@@ -2,7 +2,7 @@ module Contexts (
     showContext, hideContext, activeContextData, selectedContext
 ) where
 
-import Control.Lens hiding (Context)
+import Control.Lens hiding (Context, contexts)
 import Data.Maybe
 import Data.List
 import qualified Data.Map as M
@@ -29,5 +29,5 @@ hideContext ctx = do
 
 activeContextData :: NWM [ContextData]
 activeContextData = do
-    ctxDataMap <- use contextDataMap
-    mapMaybe (flip M.lookup ctxDataMap) <$> use activeContexts
+    ctxs <- use contexts
+    mapMaybe (flip M.lookup ctxs) <$> use activeContexts

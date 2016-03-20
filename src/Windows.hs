@@ -2,16 +2,17 @@ module Windows (
     manage, unmanage, push, arrange
 ) where
 
-import qualified Data.Map     as M
+import           Control.Monad.State
+import qualified Data.Map            as M
 import           Data.Maybe
-import qualified Data.Set     as S
+import qualified Data.Set            as S
 
 import           Contexts
 import           Control.Lens
 import           Core
 import           Focus
 import           XControl
-import qualified ZipperTree   as T
+import qualified ZipperTree          as T
 
 
 arrange :: NWM ()
@@ -39,40 +40,40 @@ tile win = do
 
 
 isClient :: Window -> NWM Bool
-isClient win = M.member win <$> use windowRects
+isClient win = M.member win <$> use windows
 
 
 moveWindow :: Window -> Rect -> NWM ()
 moveWindow win rect = do
-    windowRect win .= Just rect
+    assign (windows . at win . _Just . windowRect) rect
     setWindowGeometry win rect
 
 
 showWindow :: Window -> NWM ()
 showWindow win = do
     mapWindow win
-    Just ctx <- use $ windowContexts . at win
+    Just ctx <- preview (windows . at win . _Just . windowContext) <$> get
     contextData ctx . visibleWindows %= S.insert win
-    arrange
     focus win
 
 
 hideWindow :: Window -> NWM ()
 hideWindow win = do
-    Just ctx <- use $ windowContexts . at win
+    Just ctx <- preview (windows . at win . _Just . windowContext) <$> get
     contextData ctx . visibleWindows %= S.delete win
-    arrange
-    focusedWin >>= \foc -> case foc of
-        Just w | w == win -> focusClosest win
-        _                 -> return ()
 
 
 manage :: Window -> NWM ()
 manage win = do
-    Just <$> getWindowGeometry win >>= assign (windowRect win)
-    Just <$> selectedContext >>= assign (windowContexts . at win)
+    rect <- getWindowGeometry win
+    ctx <- selectedContext
+    assign (windows . at win ) $ Just $ WindowData
+        { _windowRect    = rect
+        , _windowContext = ctx
+        }
     tile win
     showWindow win
+    arrange
 
 
 
@@ -80,7 +81,8 @@ unmanage :: Window -> NWM ()
 unmanage win = do
     windowTree %= T.delete win . T.unzip
     hideWindow win
-    windowRect win .= Nothing
+    arrange
+    windows . at win .= Nothing
 
 
 

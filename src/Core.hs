@@ -4,18 +4,19 @@
 
 module Core (
     XControl, runXControl, forkControl,
-    windowTree, windowGap, windowRects, windowRect, activeContexts,
-    windowContexts,
-    contextDataMap, contextData,
+    windowTree, windowGap, activeContexts,
+    windows, windowContext, windowRect,
+    contexts, contextData,
     focusedWindow, visibleWindows,
     whenJust,
     NWM, runNWM, NWMState, initialState,
     HasControl (..),
-    Rect (..), Window, Context (..), ContextData (..)
+    Rect (..), Window, WindowData (..),
+    Context (..), ContextData (..)
 ) where
 
 import           Control.Concurrent
-import           Control.Lens         hiding (Context)
+import           Control.Lens         hiding (Context, contexts)
 import           Control.Monad.Reader
 import           Control.Monad.State
 import qualified Data.Map             as M
@@ -46,14 +47,23 @@ emptyContextData = ContextData
     , _focusedWindow  = Nothing
     }
 
+
 makeLenses ''ContextData
 
 
+data WindowData = WindowData
+    { _windowRect    :: Rect
+    , _windowContext :: Context
+    }
+
+
+makeLenses ''WindowData
+
+
 data NWMState = NWMState
-    { _windowRects    :: M.Map Window Rect
-    , _windowContexts :: M.Map Window Context
+    { _windows        :: M.Map Window WindowData
     , _windowTree     :: T.ZipperTree Window
-    , _contextDataMap :: M.Map Context ContextData
+    , _contexts       :: M.Map Context ContextData
     , _activeContexts :: [Context]
     , _windowGap      :: Int
     }
@@ -62,19 +72,15 @@ data NWMState = NWMState
 makeLenses ''NWMState
 
 
-windowRect :: Window -> Lens' NWMState (Maybe Rect)
-windowRect win = windowRects . at win
-
 contextData :: Context -> Lens' NWMState ContextData
-contextData context = contextDataMap . at context . non emptyContextData
+contextData context = contexts . at context . non emptyContextData
 
 
 initialState :: NWMState
 initialState = NWMState
-    { _windowRects    = M.empty
-    , _windowContexts = M.empty
+    { _windows        = M.empty
     , _windowTree     = T.empty
-    , _contextDataMap = M.empty
+    , _contexts       = M.empty
     , _activeContexts = [Root]
     , _windowGap      = 5
     }

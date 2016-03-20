@@ -8,6 +8,7 @@ import           Data.List
 import qualified Data.Map      as M
 import           Data.Maybe
 import qualified Data.Set      as S
+import Control.Monad.State
 
 import           Contexts
 import           Core
@@ -17,7 +18,7 @@ import qualified ZipperTree    as T
 
 focus :: Window -> NWM ()
 focus win = do
-    Just ctx <- use $ windowContexts . at win
+    Just ctx <- preview (windows . at win . _Just . windowContext) <$> get
     contextData ctx . focusedWindow .= Just win
     activeContexts %= (ctx:) . (delete ctx)
     giveFocus win
@@ -38,12 +39,13 @@ focusedWin = listToMaybe . mapMaybe (view focusedWindow) <$> activeContextData
 visibleWindowRects :: NWM [(Window, Rect)]
 visibleWindowRects = do
     isVisible <- flip S.member <$> visibleWs
-    filter (isVisible . fst) . M.assocs <$> use windowRects
+    filter (isVisible . fst) . rects <$> use windows
+        where rects = map (\(w,d) -> (w, view windowRect d)) . M.assocs
 
 
 focusClosest :: Window -> NWM ()
 focusClosest win = do
-    Just rect <- use (windowRect win)
+    Just rect <- preview (windows . at win . _Just . windowRect) <$> get
     candidates <- filter ((/=win) . fst) <$> visibleWindowRects
     whenJust . fmap focus $ closestWin candidates (center rect)
 
@@ -54,9 +56,9 @@ moveFocus d = do
     case win' of
       Nothing -> return ()
       Just win -> do
-        pt <- fmap center <$> use (windowRect win)
+        Just rect <- preview (windows . at win . _Just . windowRect) <$> get
         candidates <- filter ((/=win) . fst) <$> visibleWindowRects
-        whenJust . fmap focus $ pt >>= closestWin' d candidates
+        whenJust $ focus <$> closestWin' d candidates (center rect)
 
 
 closest :: [(a, (Int, Int))] -> Maybe a
