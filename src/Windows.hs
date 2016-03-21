@@ -39,10 +39,6 @@ tile win = do
     windowTree .= (T.tree . fmap (T.insert dir 0.5 (T.leaf win)) $ loc)
 
 
-isClient :: Window -> NWM Bool
-isClient win = M.member win <$> use windows
-
-
 moveWindow :: Window -> Rect -> NWM ()
 moveWindow win rect = do
     assign (windows . at win . _Just . windowRect) rect
@@ -79,10 +75,12 @@ manage win = do
 
 unmanage :: Window -> NWM ()
 unmanage win = do
-    windowTree %= T.delete win . T.unzip
-    hideWindow win
-    arrange
-    windows . at win .= Nothing
+    isClient <- M.member win <$> use windows
+    when isClient $ do
+        windowTree %= T.delete win . T.unzip
+        hideWindow win
+        arrange
+        windows . at win .= Nothing
 
 
 

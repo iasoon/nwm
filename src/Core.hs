@@ -7,12 +7,13 @@ module Core (
     windowTree, windowGap, activeContexts,
     windows, windowContext, windowRect,
     contexts, contextData,
-    focusedWindow, visibleWindows,
     whenJust,
     NWM, runNWM, NWMState, initialState,
     HasControl (..),
     Rect (..), Window, WindowData (..),
-    Context (..), ContextData (..)
+    Context (..), ContextData (..),
+    focusedWindow, visibleWindows
+
 ) where
 
 import           Control.Concurrent

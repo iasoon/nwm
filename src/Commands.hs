@@ -6,8 +6,9 @@ import           Control.Exception                (catch, throwIO)
 import           Control.Monad
 import           Control.Monad.Trans
 import           Data.Attoparsec.ByteString.Char8
+import qualified Data.ByteString.Char8            as BS
 import           Data.Word                        (Word32)
-import           Network.Socket                   hiding (recv)
+import           Network.Socket                   hiding (recv, send)
 import           Network.Socket.ByteString
 import           System.Directory
 import           System.Exit                      (exitSuccess)
@@ -23,6 +24,7 @@ import qualified ZipperTree                       as T
 address :: String
 address = "/tmp/nwm_socket"
 
+
 openSocket :: IO Socket
 openSocket = do
     sock <- socket AF_UNIX Stream defaultProtocol
@@ -31,27 +33,35 @@ openSocket = do
     listen sock sOMAXCONN
     return sock
 
+
 readCommands :: XControl ()
 readCommands = do
     sock <- liftIO openSocket
     forever (liftIO (accept sock) >>= serveClient)
 
+
 serveClient :: (Socket, SockAddr) -> XControl ()
 serveClient (sock, _) = do
-    res <- liftIO $ parseOnly command <$> recv sock 4096
+    res <- liftIO $ parseOnly command <$> recv sock 8192
     case res of
-      Right cmd -> runNWM cmd
-      Left  err -> liftIO $ putStrLn err
+      Right cmd -> runNWM (cmd sock)
+      Left  err -> liftIO $ putStrLn ("err " ++ err)
     liftIO $ close sock
 
-command :: Parser (NWM ())
-command =  choice [windowCmd, focusCmd, contextCmd, exitCmd]
 
-windowCmd :: Parser (NWM ())
-windowCmd = "push " *> ((>> arrange) <$>  (push <$> direction))
+type Command = Socket -> NWM ()
 
-focusCmd :: Parser (NWM ())
-focusCmd = "focus " *> (moveFocus <$> direction)
+
+command :: Parser Command
+command =  choice [windowCmd, contextCmd, exitCmd]
+
+
+windowCmd :: Parser Command
+windowCmd = const <$> choice
+    [ "push "  *> ((>> arrange) <$> (push <$> direction))
+    , "focus " *> (moveFocus <$> direction)
+    ]
+
 
 direction :: Parser T.Direction
 direction = choice
@@ -61,20 +71,38 @@ direction = choice
     , "down"  *> return T.down
     ]
 
-contextCmd :: Parser (NWM ())
-contextCmd = (>> arrange) <$> choice
-    [ "show " *> (showContext <$> context)
-    , "hide " *> (hideContext <$> context)
+contextCmd :: Parser Command
+contextCmd = "context " *> choice
+        [ manipulateContexts
+        , "list" *> return listContexts
+        ]
+
+
+listContexts :: Command
+listContexts sock = do
+    msg <- BS.pack . unlines <$> namedContexts
+    liftIO $ send sock msg >> return ()
+
+
+manipulateContexts :: Parser Command
+manipulateContexts = (\x -> const (x >> arrange)) <$> choice
+    [ "show "   *> (showContext <$> context)
+    , "hide "   *> (hideContext <$> context)
+    , "switch " *> (switchContexts . (:[Root]) <$> context)
     ]
 
-exitCmd :: Parser (NWM ())
-exitCmd = "exit" *> return (liftIO exitSuccess)
+
+exitCmd :: Parser Command
+exitCmd = "exit" *> return (const $ liftIO exitSuccess)
+
 
 window :: Parser Window
 window = convertXid <$> hexword
 
+
 context :: Parser Context
 context = Named <$> many1 (notChar '\n')
+
 
 hexword :: Parser Word32
 hexword = option "" "0x" >> hexadecimal

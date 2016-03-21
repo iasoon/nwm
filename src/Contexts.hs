@@ -1,5 +1,7 @@
 module Contexts (
-    showContext, hideContext, activeContextData, selectedContext
+    showContext, hideContext, switchContexts,
+    namedContexts,
+    activeContextData, selectedContext
 ) where
 
 import Control.Lens hiding (Context, contexts)
@@ -27,7 +29,19 @@ hideContext ctx = do
     use (contextData ctx . visibleWindows) >>= mapM_ unmapWindow
 
 
+switchContexts :: [Context] -> NWM ()
+switchContexts ctxs = do
+    use activeContexts >>= mapM_ hideContext
+    mapM_ showContext (reverse ctxs)
+
+
 activeContextData :: NWM [ContextData]
 activeContextData = do
     ctxs <- use contexts
     mapMaybe (flip M.lookup ctxs) <$> use activeContexts
+
+
+namedContexts :: NWM [String]
+namedContexts = mapMaybe name . M.keys <$> use contexts
+    where name (Root)    = Nothing
+          name (Named n) = Just n
