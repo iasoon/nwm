@@ -57,10 +57,18 @@ command =  choice [windowCmd, contextCmd, exitCmd]
 
 
 windowCmd :: Parser Command
-windowCmd = const <$> choice
+windowCmd = "window " *> (const <$> choice
     [ "push "  *> ((>> arrange) <$> (push <$> direction))
     , "focus " *> (moveFocus <$> direction)
-    ]
+    , "name "  *> (nameFocused <$> name)
+    , "show " *> ((\w -> w >>= maybe (return ()) showWindow >> arrange) . windowNamed <$> name)
+    , "hide " *> ((\w -> w >>= maybe (return ()) hideWindow >> arrange) . windowNamed <$> name)
+    ])
+
+nameFocused :: String -> NWM ()
+nameFocused name = do
+    focus <- focusedWin
+    maybe (return ()) (nameWindow name) focus
 
 
 direction :: Parser T.Direction
@@ -100,8 +108,11 @@ window :: Parser Window
 window = convertXid <$> hexword
 
 
+name :: Parser String
+name = many1 (notChar '\n')
+
 context :: Parser Context
-context = Named <$> many1 (notChar '\n')
+context = Named <$> name
 
 
 hexword :: Parser Word32

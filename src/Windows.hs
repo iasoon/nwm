@@ -1,14 +1,15 @@
 module Windows (
-    manage, unmanage, push, arrange
+    manage, unmanage, push, arrange, nameWindow, windowNamed,
+    showWindow, hideWindow
 ) where
 
+import           Control.Lens        hiding (Context, contexts)
 import           Control.Monad.State
 import qualified Data.Map            as M
 import           Data.Maybe
 import qualified Data.Set            as S
 
 import           Contexts
-import           Control.Lens
 import           Core
 import           Focus
 import           XControl
@@ -55,8 +56,24 @@ showWindow win = do
 
 hideWindow :: Window -> NWM ()
 hideWindow win = do
+    unmapWindow win
     Just ctx <- preview (windows . at win . _Just . windowContext) <$> get
     contextData ctx . visibleWindows %= S.delete win
+
+nameWindow :: String -> Window -> NWM ()
+nameWindow name win = do
+    Just ctx <- preview (windows . at win . _Just . windowContext) <$> get
+    prev <- preview (contexts . at ctx . _Just . namedWindows . at name . _Just) <$> get
+    case prev of
+      Nothing -> return ()
+      Just w  -> assign (windows . at w . _Just . windowName) Nothing
+    assign (windows . at win . _Just . windowName) (Just name)
+    assign (contexts . at ctx . _Just . namedWindows . at name) (Just win)
+
+
+windowNamed :: String -> NWM (Maybe Window)
+windowNamed name = listToMaybe . mapMaybe find <$> activeContextData
+    where find = view (namedWindows . at name)
 
 
 manage :: Window -> NWM ()
@@ -66,6 +83,7 @@ manage win = do
     assign (windows . at win ) $ Just $ WindowData
         { _windowRect    = rect
         , _windowContext = ctx
+        , _windowName    = Nothing
         }
     tile win
     showWindow win
@@ -93,8 +111,6 @@ pushWin d win = do
     t <- use windowTree
     whenJust $ assign windowTree . T.tree . T.push d <$> T.find win t
     arrange
-
-
 
 
 shaveRect :: Int -> Rect -> Rect

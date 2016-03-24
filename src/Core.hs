@@ -5,15 +5,14 @@
 module Core (
     XControl, runXControl, forkControl,
     windowTree, windowGap, activeContexts,
-    windows, windowContext, windowRect,
+    windows, windowContext, windowRect, windowName,
     contexts, contextData,
     whenJust,
     NWM, runNWM, NWMState, initialState,
     HasControl (..),
     Rect (..), Window, WindowData (..),
     Context (..), ContextData (..),
-    focusedWindow, visibleWindows
-
+    focusedWindow, visibleWindows, namedWindows
 ) where
 
 import           Control.Concurrent
@@ -39,6 +38,7 @@ data Context = Root | Named String deriving (Eq, Ord, Show)
 data ContextData = ContextData
     { _visibleWindows :: S.Set Window
     , _focusedWindow  :: Maybe Window
+    , _namedWindows   :: M.Map String Window
     } deriving (Eq, Show)
 
 
@@ -46,6 +46,7 @@ emptyContextData :: ContextData
 emptyContextData = ContextData
     { _visibleWindows = S.empty
     , _focusedWindow  = Nothing
+    , _namedWindows   = M.empty
     }
 
 
@@ -55,6 +56,7 @@ makeLenses ''ContextData
 data WindowData = WindowData
     { _windowRect    :: Rect
     , _windowContext :: Context
+    , _windowName    :: Maybe String
     }
 
 
