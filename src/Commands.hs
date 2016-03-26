@@ -79,6 +79,7 @@ direction = choice
     , "down"  *> return T.down
     ]
 
+
 contextCmd :: Parser Command
 contextCmd = "context " *> choice
         [ manipulateContexts

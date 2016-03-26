@@ -7,7 +7,7 @@ module XControl (
     mapWindow, unmapWindow, giveFocus,
     getWindowGeometry, setWindowGeometry,
     subscribeEvents, waitForEvent,
-    screenRect,
+    screenRect, setBorder,
     convertXid
 ) where
 
@@ -62,6 +62,15 @@ getWindowGeometry win = do
             (fromIntegral $ X.width_GetGeometryReply reply)
             (fromIntegral $ X.height_GetGeometryReply reply)
 
+
+setBorder :: HasControl m => Int -> Int -> Window -> m ()
+setBorder width color win = do
+    withConn2 X.configureWindow win $ X.toValueParam
+        [(X.ConfigWindowBorderWidth, fromIntegral width)]
+    withConn2 X.changeWindowAttributes win $ X.toValueParam
+        [(X.CWBorderPixel, fromIntegral color)]
+
+
 warpPointer :: HasControl m => Int -> Int -> m ()
 warpPointer x y = do
     root <- getRoot
@@ -71,6 +80,7 @@ warpPointer x y = do
 giveFocus :: HasControl m => Window -> m ()
 giveFocus window = withConn X.setInputFocus $ X.MkSetInputFocus
                      X.InputFocusPointerRoot window 0
+
 
 screenRect :: HasControl m => m Rect
 screenRect = do

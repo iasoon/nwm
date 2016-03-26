@@ -17,7 +17,7 @@ import qualified ZipperTree          as T
 
 
 arrange :: NWM ()
-arrange = do
+arrange = fixFocus $ do
     -- Rezip layout tree
     isVisible <- flip S.member <$> visibleWs
     windowTree %= T.zip isVisible . T.unzip
@@ -26,9 +26,8 @@ arrange = do
     use windowTree >>= arrangeTree rect
     -- Fix focus
     focusedWin >>= \focused -> case focused of
-        Just win | isVisible win -> giveFocus win
-                 | otherwise     -> focusClosest win
-        Nothing                  -> return ()
+        Just win | not (isVisible win) -> focusClosest win
+        _                              -> return ()
 
 
 tile :: Window -> NWM ()
@@ -47,11 +46,11 @@ moveWindow win rect = do
 
 
 showWindow :: Window -> NWM ()
-showWindow win = do
+showWindow win = changeFocus $ do
     mapWindow win
     Just ctx <- preview (windows . at win . _Just . windowContext) <$> get
     contextData ctx . visibleWindows %= S.insert win
-    focus win
+    return $ Just win
 
 
 hideWindow :: Window -> NWM ()
@@ -59,6 +58,7 @@ hideWindow win = do
     unmapWindow win
     Just ctx <- preview (windows . at win . _Just . windowContext) <$> get
     contextData ctx . visibleWindows %= S.delete win
+
 
 nameWindow :: String -> Window -> NWM ()
 nameWindow name win = do
@@ -87,7 +87,9 @@ manage win = do
         }
     tile win
     showWindow win
+    decorate win
     arrange
+
 
 
 
@@ -118,7 +120,10 @@ shaveRect i (Rect x y w h) = Rect (x+i) (y+i) (w-2*i) (h-2*i)
 
 
 applyGap :: Rect -> NWM Rect
-applyGap = (shaveRect <$> (use windowGap) <*>) . return
+applyGap rect = do
+    gap <- use windowGap
+    border <- use borderWidth
+    return $ shaveRect (gap + border) rect
 
 
 splitRect :: T.Axis -> Rational -> Rect -> (Rect, Rect)

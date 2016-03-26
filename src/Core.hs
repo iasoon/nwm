@@ -7,6 +7,7 @@ module Core (
     windowTree, windowGap, activeContexts,
     windows, windowContext, windowRect, windowName,
     contexts, contextData,
+    borderWidth, borderColor, focusColor,
     whenJust,
     NWM, runNWM, NWMState, initialState,
     HasControl (..),
@@ -69,6 +70,9 @@ data NWMState = NWMState
     , _contexts       :: M.Map Context ContextData
     , _activeContexts :: [Context]
     , _windowGap      :: Int
+    , _borderWidth    :: Int
+    , _borderColor    :: Int
+    , _focusColor     :: Int
     }
 
 
@@ -86,6 +90,9 @@ initialState = NWMState
     , _contexts       = M.empty
     , _activeContexts = [Root]
     , _windowGap      = 5
+    , _borderWidth    = 1
+    , _borderColor    = 0xdddddd
+    , _focusColor     = 0xff0000
     }
 
 

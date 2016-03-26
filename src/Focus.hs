@@ -1,5 +1,5 @@
 module Focus (
-    focus, focusedWin, moveFocus, focusClosest, visibleWs
+    fixFocus, changeFocus, focusedWin, moveFocus, focusClosest, visibleWs, decorate
 ) where
 
 import           Control.Lens
@@ -16,16 +16,39 @@ import           XControl
 import qualified ZipperTree    as T
 
 
-focus :: Window -> NWM ()
-focus win = do
-    Just ctx <- preview (windows . at win . _Just . windowContext) <$> get
-    contextData ctx . focusedWindow .= Just win
-    activeContexts %= (ctx:) . (delete ctx)
-    giveFocus win
+fixFocus :: NWM () -> NWM ()
+fixFocus action = do
+    prev <- focusedWin
+    action
+    focus <- focusedWin
+    case focus of
+      Nothing -> return ()
+      Just win -> do
+          giveFocus win
+          whenJust $ decorate <$> prev
+          decorate win
 
 
-fixFocus :: NWM ()
-fixFocus = focusedWin >>= whenJust . fmap giveFocus
+changeFocus :: NWM (Maybe Window) -> NWM ()
+changeFocus action = fixFocus $ do
+    next <- action
+    case next of
+      Nothing  -> return ()
+      Just win -> do
+        Just ctx <- preview (windows . at win . _Just . windowContext) <$> get
+        contextData ctx . focusedWindow .= Just win
+        activeContexts %= (ctx:) . (delete ctx)
+
+
+decorate :: Window -> NWM ()
+decorate win = do
+    width <- use borderWidth
+    focused <- focusedWin
+    color <- case focused of
+        Just w | w == win -> use focusColor
+        _                 -> use borderColor
+    setBorder width color win
+
 
 
 visibleWs :: NWM (S.Set Window)
@@ -44,21 +67,21 @@ visibleWindowRects = do
 
 
 focusClosest :: Window -> NWM ()
-focusClosest win = do
+focusClosest win = changeFocus $ do
     Just rect <- preview (windows . at win . _Just . windowRect) <$> get
     candidates <- filter ((/=win) . fst) <$> visibleWindowRects
-    whenJust . fmap focus $ closestWin candidates (center rect)
+    return $ closestWin candidates (center rect)
 
 
 moveFocus :: T.Direction -> NWM ()
-moveFocus d = do
+moveFocus d = changeFocus $ do
     win' <- focusedWin
     case win' of
-      Nothing -> return ()
+      Nothing -> return Nothing
       Just win -> do
         Just rect <- preview (windows . at win . _Just . windowRect) <$> get
         candidates <- filter ((/=win) . fst) <$> visibleWindowRects
-        whenJust $ focus <$> closestWin' d candidates (center rect)
+        return $ closestWin' d candidates (center rect)
 
 
 closest :: [(a, (Int, Int))] -> Maybe a

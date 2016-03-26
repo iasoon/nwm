@@ -4,13 +4,13 @@ module Contexts (
     activeContextData, selectedContext
 ) where
 
-import Control.Lens hiding (Context, contexts)
-import Data.Maybe
-import Data.List
-import qualified Data.Map as M
+import           Control.Lens hiding (Context, contexts)
+import           Data.List
+import qualified Data.Map     as M
+import           Data.Maybe
 
-import Core
-import XControl
+import           Core
+import           XControl
 
 
 selectedContext :: NWM Context
