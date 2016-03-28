@@ -1,5 +1,5 @@
 module Focus (
-    fixFocus, changeFocus, focusedWin, moveFocus, focusClosest, visibleWs, decorate
+    fixFocus, changeFocus, focusedWin, closestWindow, moveFocus, visibleWs, decorate
 ) where
 
 import           Control.Lens
@@ -50,7 +50,6 @@ decorate win = do
     setBorder width color win
 
 
-
 visibleWs :: NWM (S.Set Window)
 visibleWs = S.unions . map (view visibleWindows) <$> activeContextData
 
@@ -58,19 +57,17 @@ visibleWs = S.unions . map (view visibleWindows) <$> activeContextData
 focusedWin :: NWM (Maybe Window)
 focusedWin = listToMaybe . mapMaybe (view focusedWindow) <$> activeContextData
 
-
-visibleWindowRects :: NWM [(Window, Rect)]
-visibleWindowRects = do
-    isVisible <- flip S.member <$> visibleWs
-    filter (isVisible . fst) . rects <$> use windows
-        where rects = map (\(w,d) -> (w, view windowRect d)) . M.assocs
+windowRects :: S.Set Window -> NWM [(Window, Rect)]
+windowRects ws = filter (inSet . fst) . rects <$> use windows
+    where inSet w = S.member w ws
+          rects = map (\(w,d) -> (w, view windowRect d)) . M.assocs
 
 
-focusClosest :: Window -> NWM ()
-focusClosest win = changeFocus $ do
+
+closestWindow :: Window -> S.Set Window -> NWM (Maybe Window)
+closestWindow win candidates = do
     Just rect <- preview (windows . at win . _Just . windowRect) <$> get
-    candidates <- filter ((/=win) . fst) <$> visibleWindowRects
-    return $ closestWin candidates (center rect)
+    closestCenter (center rect) <$> windowRects candidates
 
 
 moveFocus :: T.Direction -> NWM ()
@@ -80,8 +77,8 @@ moveFocus d = changeFocus $ do
       Nothing -> return Nothing
       Just win -> do
         Just rect <- preview (windows . at win . _Just . windowRect) <$> get
-        candidates <- filter ((/=win) . fst) <$> visibleWindowRects
-        return $ closestWin' d candidates (center rect)
+        candidates <- S.delete win <$> visibleWs
+        closestCenterDir d (center rect) <$> windowRects candidates
 
 
 closest :: [(a, (Int, Int))] -> Maybe a
@@ -91,12 +88,12 @@ closest cs = Just $ fst $ lowest $ map (over _2 centerDist) cs
           centerDist (x,y) = div (abs x + abs y) 2
 
 
-closestWin :: [(Window, Rect)] -> (Int, Int) -> Maybe Window
-closestWin rects pt = closest . relativeCenters T.right pt $ rects
+closestCenter :: (Int, Int) -> [(a, Rect)] -> Maybe a
+closestCenter pt = closest . relativeCenters T.right pt
 
 
-closestWin' :: T.Direction -> [(Window, Rect)] -> (Int, Int) -> Maybe Window
-closestWin' d rects pt =  closest . inCone . relativeCenters d pt $ rects
+closestCenterDir :: T.Direction -> (Int, Int) -> [(a, Rect)] -> Maybe a
+closestCenterDir d pt =  closest . inCone . relativeCenters d pt
     where inCone = filter ((\(x,y) -> x >= abs y) . snd)
 
 

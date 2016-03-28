@@ -17,17 +17,13 @@ import qualified ZipperTree          as T
 
 
 arrange :: NWM ()
-arrange = fixFocus $ do
+arrange = do
     -- Rezip layout tree
     isVisible <- flip S.member <$> visibleWs
     windowTree %= T.zip isVisible . T.unzip
     -- Arrange visible windows
     rect <- screenRect >>= applyGap
     use windowTree >>= arrangeTree rect
-    -- Fix focus
-    focusedWin >>= \focused -> case focused of
-        Just win | not (isVisible win) -> focusClosest win
-        _                              -> return ()
 
 
 tile :: Window -> NWM ()
@@ -58,6 +54,9 @@ hideWindow win = do
     unmapWindow win
     Just ctx <- preview (windows . at win . _Just . windowContext) <$> get
     contextData ctx . visibleWindows %= S.delete win
+    focusedWin >>= \focused -> case focused of
+        Just w | w == win -> changeFocus $ visibleWs >>= closestWindow win
+        _                 -> return ()
 
 
 nameWindow :: String -> Window -> NWM ()
@@ -91,17 +90,23 @@ manage win = do
     arrange
 
 
-
-
+-- TODO: clean this up
 unmanage :: Window -> NWM ()
 unmanage win = do
     isClient <- M.member win <$> use windows
     when isClient $ do
         windowTree %= T.delete win . T.unzip
-        hideWindow win
+        Just ctx <- preview (windows . at win . _Just . windowContext) <$> get
+        contextData ctx . visibleWindows %= S.delete win
         arrange
+        use (contextData ctx . focusedWindow) >>= \foc -> case foc of
+            Just w | w == win ->
+                use (contextData ctx . visibleWindows)
+                    >>= closestWindow win
+                    >>= assign (contextData ctx . focusedWindow)
+            _                 -> return ()
+        changeFocus focusedWin
         windows . at win .= Nothing
-
 
 
 push :: T.Direction -> NWM ()
