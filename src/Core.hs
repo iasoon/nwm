@@ -8,7 +8,7 @@ module Core (
     windows, windowContext, windowRect, windowName,
     contexts, contextData,
     borderWidth, borderColor, focusColor,
-    whenJust,
+    whenJust, try, expect,
     NWM, runNWM, NWMState, initialState,
     HasControl (..),
     Rect (..), Window, WindowData (..),
@@ -17,14 +17,15 @@ module Core (
 ) where
 
 import           Control.Concurrent
-import           Control.Lens         hiding (Context, contexts)
+import           Control.Lens              hiding (Context, contexts)
 import           Control.Monad.Reader
 import           Control.Monad.State
-import qualified Data.Map             as M
-import qualified Data.Set             as S
-import           Graphics.XHB         (Connection, WINDOW)
+import           Control.Monad.Trans.Maybe
+import qualified Data.Map                  as M
+import qualified Data.Set                  as S
+import           Graphics.XHB              (Connection, WINDOW)
 
-import qualified ZipperTree           as T
+import qualified ZipperTree                as T
 
 
 type Window = WINDOW
@@ -143,5 +144,12 @@ instance HasControl NWM where
     askConnection = NWM $ lift askConnection
 
 
-whenJust :: Monad m => Maybe (m ()) -> m ()
-whenJust = maybe (return ()) id
+whenJust :: Monad m => m (Maybe a) -> (a -> m ()) -> m ()
+whenJust m f = m >>= maybe (return ()) f
+
+expect :: Monad m => m (Maybe a) -> MaybeT m a
+expect = MaybeT
+
+try :: Monad m => MaybeT m a -> m ()
+try a = runMaybeT a >> return ()
+

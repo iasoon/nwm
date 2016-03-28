@@ -3,51 +3,44 @@ module Focus (
 ) where
 
 import           Control.Lens
-import           Data.Function (on)
+import           Control.Monad.State
+import           Data.Function       (on)
 import           Data.List
-import qualified Data.Map      as M
+import qualified Data.Map            as M
 import           Data.Maybe
-import qualified Data.Set      as S
-import Control.Monad.State
+import qualified Data.Set            as S
 
 import           Contexts
 import           Core
 import           XControl
-import qualified ZipperTree    as T
+import qualified ZipperTree          as T
 
 
 fixFocus :: NWM () -> NWM ()
 fixFocus action = do
     prev <- focusedWin
     action
-    focus <- focusedWin
-    case focus of
-      Nothing -> return ()
-      Just win -> do
-          giveFocus win
-          whenJust $ decorate <$> prev
-          decorate win
+    maybe (return ()) decorate prev
+    try $ do
+        win <- expect focusedWin
+        lift $ giveFocus win >> decorate win
 
 
 changeFocus :: NWM (Maybe Window) -> NWM ()
-changeFocus action = fixFocus $ do
-    next <- action
-    case next of
-      Nothing  -> return ()
-      Just win -> do
+changeFocus action = fixFocus $ try $ do
+    expect action >>= \win -> lift $ do
         Just ctx <- preview (windows . at win . _Just . windowContext) <$> get
         contextData ctx . focusedWindow .= Just win
         activeContexts %= (ctx:) . (delete ctx)
 
 
 decorate :: Window -> NWM ()
-decorate win = do
-    width <- use borderWidth
-    focused <- focusedWin
-    color <- case focused of
-        Just w | w == win -> use focusColor
-        _                 -> use borderColor
-    setBorder width color win
+decorate win = use borderWidth >>= \width -> try $
+    expect focusedWin >>= \focused -> lift $ do
+        color <- if focused == win
+                    then use focusColor
+                    else use borderColor
+        setBorder width color win
 
 
 visibleWs :: NWM (S.Set Window)
@@ -71,11 +64,9 @@ closestWindow win candidates = do
 
 
 moveFocus :: T.Direction -> NWM ()
-moveFocus d = changeFocus $ do
-    win' <- focusedWin
-    case win' of
-      Nothing -> return Nothing
-      Just win -> do
+moveFocus d = try $ do
+    win <- expect focusedWin
+    lift $ changeFocus $ do
         Just rect <- preview (windows . at win . _Just . windowRect) <$> get
         candidates <- S.delete win <$> visibleWs
         closestCenterDir d (center rect) <$> windowRects candidates

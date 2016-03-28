@@ -54,18 +54,18 @@ hideWindow win = do
     unmapWindow win
     Just ctx <- preview (windows . at win . _Just . windowContext) <$> get
     contextData ctx . visibleWindows %= S.delete win
-    focusedWin >>= \focused -> case focused of
-        Just w | w == win -> changeFocus $ visibleWs >>= closestWindow win
-        _                 -> return ()
+    try $ do
+        focused <- expect focusedWin
+        guard (focused == win)
+        lift $ changeFocus $ visibleWs >>= closestWindow win
 
 
 nameWindow :: String -> Window -> NWM ()
 nameWindow name win = do
     Just ctx <- preview (windows . at win . _Just . windowContext) <$> get
-    prev <- preview (contexts . at ctx . _Just . namedWindows . at name . _Just) <$> get
-    case prev of
-      Nothing -> return ()
-      Just w  -> assign (windows . at w . _Just . windowName) Nothing
+    try $ do
+        w <- expect $ preview (contexts . at ctx . _Just . namedWindows . at name . _Just) <$> get
+        assign (windows . at w . _Just . windowName) Nothing
     assign (windows . at win . _Just . windowName) (Just name)
     assign (contexts . at ctx . _Just . namedWindows . at name) (Just win)
 
@@ -110,14 +110,14 @@ unmanage win = do
 
 
 push :: T.Direction -> NWM ()
-push d = focusedWin >>= whenJust . fmap (pushWin d)
+push d = try $ expect focusedWin >>= lift . pushWin d
 
 
 pushWin :: T.Direction -> Window -> NWM ()
-pushWin d win = do
-    t <- use windowTree
-    whenJust $ assign windowTree . T.tree . T.push d <$> T.find win t
-    arrange
+pushWin d win = try $ do
+    loc <- expect $ T.find win <$> use windowTree
+    assign windowTree $ T.tree $ T.push d loc
+    lift arrange
 
 
 shaveRect :: Int -> Rect -> Rect
